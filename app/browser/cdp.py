@@ -47,7 +47,12 @@ class _CdpPortRetryError(CdpLaunchError):
 
 
 class ChromeLocator:
-    """Locate only a stable Google Chrome installation."""
+    """Locate a stable system Chrome/Chromium install.
+
+    Brave is preferred (use the system browser, avoid downloading a bundled
+    Chromium); Google Chrome is the fallback. Both are Chromium-based and share
+    the same CDP launch flags, so either works for the owned-Chrome CDP backend.
+    """
 
     def __init__(
             self, *, system: str | None = None,
@@ -66,24 +71,34 @@ class ChromeLocator:
         self.which = which or shutil.which
 
     def find(self) -> Path | None:
+        # Brave 优先(系统已装则用,避免下载 Chromium),Google Chrome 兜底。
+        # 两者都是 Chromium 内核,CDP 启动参数完全通用。
         candidates: list[Path] = []
         if self.system == "Windows":
             for env_name in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
                 root = self.environ.get(env_name.casefold())
-                if root:
-                    candidates.append(
-                        Path(root) / "Google" / "Chrome" / "Application" / "chrome.exe")
+                if not root:
+                    continue
+                candidates.append(
+                    Path(root) / "BraveSoftware" / "Brave-Browser"
+                    / "Application" / "brave.exe")
+                candidates.append(
+                    Path(root) / "Google" / "Chrome" / "Application" / "chrome.exe")
         elif self.system == "Darwin":
             candidates.extend((
+                Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
+                Path.home() / "Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
                 Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
                 Path.home() / "Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             ))
         else:
-            for binary in ("google-chrome-stable", "google-chrome"):
+            for binary in ("brave-browser", "brave", "google-chrome-stable", "google-chrome"):
                 found = self.which(binary)
                 if found:
                     return Path(found)
             candidates.extend((
+                Path("/usr/bin/brave-browser"),
+                Path("/opt/brave.com/brave/brave"),
                 Path("/usr/bin/google-chrome-stable"),
                 Path("/usr/bin/google-chrome"),
                 Path("/opt/google/chrome/google-chrome"),
